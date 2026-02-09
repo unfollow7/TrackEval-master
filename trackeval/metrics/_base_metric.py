@@ -80,11 +80,11 @@ class _BaseMetric(ABC):
         vals = []
         for h in self.summary_fields:
             if h in self.float_array_fields:
-                vals.append("{0:1.5g}".format(100 * np.mean(results_[h])))
+                vals.append(np.mean(results_[h]))
             elif h in self.float_fields:
-                vals.append("{0:1.5g}".format(100 * float(results_[h])))
+                vals.append(float(results_[h]))
             elif h in self.integer_fields:
-                vals.append("{0:d}".format(int(results_[h])))
+                vals.append(int(results_[h]))
             else:
                 raise NotImplementedError("Summary function not implemented for this field type.")
         return vals
