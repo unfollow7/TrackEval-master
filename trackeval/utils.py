@@ -1,8 +1,7 @@
 
 import os
-import csv
 import argparse
-from collections import OrderedDict
+from pandas import DataFrame
 
 
 def init_config(config, default_config, name=None):
@@ -76,49 +75,42 @@ def validate_metrics_list(metrics_list):
 
 def write_summary_results(summaries, cls, output_folder):
     """Write summary results to file"""
-
-    fields = sum([list(s.keys()) for s in summaries], [])
-    values = sum([list(s.values()) for s in summaries], [])
-
-    # In order to remain consistent upon new fields being adding, for each of the following fields if they are present
-    # they will be output in the summary first in the order below. Any further fields will be output in the order each
-    # metric family is called, and within each family either in the order they were added to the dict (python >= 3.6) or
-    # randomly (python < 3.6).
-    default_order = ['HOTA', 'DetA', 'AssA', 'DetRe', 'DetPr', 'AssRe', 'AssPr', 'LocA', 'OWTA', 'HOTA(0)', 'LocA(0)',
-                     'HOTALocA(0)', 'MOTA', 'MOTP', 'MODA', 'CLR_Re', 'CLR_Pr', 'MTR', 'PTR', 'MLR', 'CLR_TP', 'CLR_FN',
-                     'CLR_FP', 'IDSW', 'MT', 'PT', 'ML', 'Frag', 'sMOTA', 'IDF1', 'IDR', 'IDP', 'IDTP', 'IDFN', 'IDFP',
-                     'Dets', 'GT_Dets', 'IDs', 'GT_IDs']
-    default_ordered_dict = OrderedDict(zip(default_order, [None for _ in default_order]))
-    for f, v in zip(fields, values):
-        default_ordered_dict[f] = v
-    for df in default_order:
-        if default_ordered_dict[df] is None:
-            del default_ordered_dict[df]
-    fields = list(default_ordered_dict.keys())
-    values = list(default_ordered_dict.values())
-
-    out_file = os.path.join(output_folder, cls + '_summary.txt')
+    out_file = os.path.join(output_folder, cls + '_summary.csv')
+    if os.path.exists(out_file):
+        os.remove(out_file)
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
-    with open(out_file, 'w', newline='') as f:
-        writer = csv.writer(f, delimiter=' ')
-        writer.writerow(fields)
-        writer.writerow(values)
+    for sums in summaries:
+        x = DataFrame(sums)
+        x = DataFrame(x.values.T, index=x.columns, columns=x.index)
+        with open(out_file, 'a', newline='') as f:
+            x.to_csv(f, mode="a", index=True)
+            f.write("\n")
 
 
 def write_detailed_results(details, cls, output_folder):
     """Write detailed results to file"""
-    sequences = details[0].keys()
-    fields = ['seq'] + sum([list(s['COMBINED_SEQ'].keys()) for s in details], [])
     out_file = os.path.join(output_folder, cls + '_detailed.csv')
+    if os.path.exists(out_file):
+        os.remove(out_file)
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
-    with open(out_file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(fields)
-        for seq in sorted(sequences):
-            if seq == 'COMBINED_SEQ':
-                continue
-            writer.writerow([seq] + sum([list(s[seq].values()) for s in details], []))
-        writer.writerow(['COMBINED'] + sum([list(s['COMBINED_SEQ'].values()) for s in details], []))
+    for detail in details:
+        x = DataFrame(detail)
+        x = DataFrame(x.values.T, index=x.columns, columns=x.index)
+        col_classes = {"ori": []}
+        for col in x.columns.tolist():
+            if "___" in col:
+                the_class = col.split("___", 1)[0]
+                if the_class not in col_classes.keys():
+                    col_classes[the_class] = [col]
+                else:
+                    col_classes[the_class].append(col)
+            else:
+                col_classes["ori"].append(col)
+        for v in col_classes.values():
+            tmp_df = x[v]
+            with open(out_file, 'a', newline='') as f:
+                tmp_df.to_csv(f, mode="a", index=True)
+                f.write("\n")
 
 
 def load_detail(file):
